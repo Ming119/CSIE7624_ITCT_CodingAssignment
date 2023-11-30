@@ -15,4 +15,4 @@ if __name__ == "__main__":
   
   jpeg = JPEG(input)
   jpeg.decode()
-  plt.imsave("out.png", jpeg.decodeedImage)
+  jpeg.save("output.bmp")
