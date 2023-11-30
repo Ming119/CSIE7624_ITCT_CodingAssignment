@@ -19,26 +19,79 @@ marker_mapping: dict = {
   0xFFC0: "Start of Frame (SOF0)",
   0xFFC4: "Define Huffman Table (DHT)",
   0xFFDA: "Start of Scan (SOS)",
-  0xFFD9: "End of Image (EOI)"
+  0xFFD9: "End of Image (EOI)",
+  
+  0xFFFE: "Comment (COM)",
 }
 
-def idct2d(input: np.ndarray) -> np.ndarray:
-  l = image.shape[0]
-  c = np.zeros((l, l))
-  for k in range(l):
-    for n in range(l):
-      c[k, n] = np.sqrt(1/l) * np.cos(np.pi*k*(1/2+n)/l)
-      if k != 0:
-        c[k, n] *= np.sqrt(2)
-  return (np.kron(c, c) @ input.flatten()).reshape((l, l))
+class JPEG:
+  def __init__(self, image_path: str):
+    with open(image_path, "rb") as jpegfile:
+      self.image_data = jpegfile.read()
+  
+  def decodeHuffmanTable(self, data: bytes):
+    # print("Huffman Table")
+    pass
 
-def quantize(input: np.ndarray, q: np.ndarray) -> np.ndarray:
-  return input // q
+  def decodeQuantizationTable(self, data: bytes):
+    # print("Quantization Table")
+    pass
 
-def decodeNumber(code, bits):
-  l = 2 ** (code - 1)
-  if bits >= l: return bits
-  return bits - (2 * l - 1)
+  def decodeSOF(self, data: bytes):
+    # print("Start of Frame")
+    pass
+
+  def decodeSOS(self, data: bytes):
+    # print("Start of Scan")
+    pass
+
+  def decode(self):
+    data = self.image_data
+    while len(data) > 0:
+      marker = int.from_bytes(data[:2], "big")
+      print(f"{marker_mapping[marker]}", end="")
+
+      if marker == 0xFFD8:    # SOI
+        data = data[2:]
+      elif marker == 0xFFD9:  # EOI
+        print()
+        return
+      elif marker == 0xFFDA:  # SOS
+        self.decodeSOS(data[2:-2])
+        data = data[-2:]
+      else:
+        length = int.from_bytes(data[2:4], "big")
+        chunk = data[4:2+length]
+        data = data[2+length:]
+        print(f"\tLength: {length} bytes", end="")
+        if marker == 0xFFC4:    # DHT
+          self.decodeHuffmanTable(chunk)
+        elif marker == 0xFFDB:  # DQT
+          self.decodeQuantizationTable(chunk)
+        elif marker == 0xFFC0:  # SOF0
+          self.decodeSOF(chunk)
+        else:
+          print(f"\tskipped", end="")
+      
+      print()
+
+# def idct2d(input: np.ndarray) -> np.ndarray:
+#   l = input.shape[0]
+#   c = np.zeros((l, l))
+#   for k in range(l):
+#     for n in range(l):
+#       c[k, n] = np.sqrt(1/l) * np.cos(np.pi*k*(1/2+n)/l)
+#       if k != 0:
+#         c[k, n] *= np.sqrt(2)
+#   return (np.kron(c, c) @ input.flatten()).reshape((l, l))
+
+# def quantize(input: np.ndarray, q: np.ndarray) -> np.ndarray:
+#   return input // q
+
+# def decodeNumber(code, bits):
+#   l = 2 ** (code - 1)
+#   if bits >= l: return bits
+#   return bits - (2 * l - 1)
 
 if __name__ == "__main__":
   if (len(sys.argv) != 2):
@@ -50,6 +103,5 @@ if __name__ == "__main__":
     print("Input file must be a JPEG image")
     exit(1)
   
-  with open(input, "rb") as jpegfile:
-    image = np.frombuffer(jpegfile.read(), dtype=np.uint8)
-  
+  jpeg = JPEG(input)
+  jpeg.decode()
