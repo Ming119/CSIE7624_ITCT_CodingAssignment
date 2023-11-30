@@ -94,10 +94,12 @@ class JPEG:
     with open(image_path, "rb") as jpegfile:
       self.image_data = jpegfile.read()
 
-    self.quantizationTabel: dict = {}
     self.height: int = 0
     self.width: int = 0
+    self.quantizationTabel: dict = {}
+    self.huffmanTables: dict = {}
     self.numComponents: int = 0
+
     self.horizantalSubsamplingFactor: list = []
     self.verticalSubsamplingFactor: list = []
     self.quantizationTabelMapping: list = []
@@ -123,8 +125,25 @@ class JPEG:
       self.verticalSubsamplingFactor.append(subsamplingFactor & 0x0F)
 
   def decodeHuffmanTable(self, data: np.ndarray):
-    # print("Huffman Table")
-    pass
+    offset = 0
+
+    while offset < len(data):
+      tcth = int.from_bytes(data[offset:offset+1], "big")
+      tableClass = tcth >> 4
+      tableIdentifier = tcth & 0x0F
+      offset += 1
+
+      lengths = [int(byte) for byte in data[offset:offset+16]]
+      offset += 16
+
+      elements = []
+      for length in lengths:
+        elements.extend([int(byte) for byte in data[offset:offset+length]])
+        offset += length
+      
+      huffmanTable = HuffmanTable()
+      huffmanTable.getHuffmanBits(lengths, elements)
+      self.huffmanTables[tableClass << 1 | tableIdentifier] = huffmanTable
 
   def decodeSOS(self, data: np.ndarray):
     # print("Start of Scan")
