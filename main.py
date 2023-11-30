@@ -1,5 +1,7 @@
 import sys
 import numpy as np
+from struct import unpack
+import matplotlib.pyplot as plt
 
 zigzag: np.ndarray = np.array([
    0,  1,  5,  6, 14, 15, 27, 28,
@@ -31,6 +33,45 @@ subsample_mapping: dict = {
   "41": "4:1:1",
 }
 
+def decodeNumber(code, bits):
+  l = 2 ** (code - 1)
+  if bits >= l: return bits
+  return bits - (2 * l - 1)
+
+class DCT:
+  def __init__(self):
+    self.base = np.zeros(64)
+    self.zigzag = np.array([
+      [ 0,  1,  5,  6, 14, 15, 27, 28],
+      [ 2,  4,  7, 13, 16, 26, 29, 42],
+      [ 3,  8, 12, 17, 25, 30, 41, 43],
+      [ 9, 11, 18, 24, 31, 40, 44, 53],
+      [10, 19, 23, 32, 39, 45, 52, 54],
+      [20, 22, 33, 38, 46, 51, 55, 60],
+      [21, 34, 37, 47, 50, 56, 59, 61],
+      [35, 36, 48, 49, 57, 58, 62, 63]
+    ]).flatten()
+    
+    l = 8
+    self._dct = np.zeros((l, l))
+    for k in range(l):
+      for n in range(l):
+        self._dct[k, n] = np.sqrt(1/l) * np.cos(np.pi*k*(1/2+n)/l)
+        if k != 0:
+          self._dct[k, n] *= np.sqrt(2)
+  
+  def dct(self):
+    self.base = np.kron(self._dct, self._dct) @ self.base
+  
+  def idct(self):
+    self.base = np.kron(self._dct.T, self._dct.T) @ self.base
+  
+  def rearrange(self):
+    newIdx = np.ones(64).astype('int8')
+    for i in range(64):
+      newIdx[list(self.zigzag).index(i)] = i
+    self.base = self.base[newIdx]
+
 class Image:
   def __init__(self, height: int, width: int):
     self.height: int = height
@@ -57,19 +98,19 @@ class Image:
 class Stream:
   def __init__(self, data: np.ndarray):
     self.data: np.ndarray = data
-    self.pos: int = 0
+    self.position: int = 0
 
   def getBit(self):
-    byte = self.data[self.pos >> 3]
-    bit = (byte >> (7 - (self.pos & 0x07))) & 0x01
-    self.pos += 1
+    byte = self.data[self.position >> 3]
+    bit = (byte >> (7 - (self.position & 0x07))) & 0x01
+    self.position += 1
     return bit
 
   def getBits(self, n: int):
-    res = 0
+    bits = 0
     for _ in range(n):
-      res = (res << 1) | self.getBit()
-    return res
+      bits = (bits << 1) | self.getBit()
+    return bits
 
 class HuffmanTable:
   def __init__(self):
@@ -80,7 +121,7 @@ class HuffmanTable:
     if isinstance(root, list):
       if pos == 0:
         if len(root) < 2:
-          root.append([element])
+          root.append(element)
           return True
         return False
       
@@ -106,7 +147,7 @@ class HuffmanTable:
       root = root[stream.getBit()]
     return root
   
-  def getcode(self, stream: Stream) -> int:
+  def getCode(self, stream: Stream) -> int:
     while True:
       res: int = self.find(stream)
       if res == 0: return 0
@@ -117,6 +158,7 @@ class JPEG:
     with open(image_path, "rb") as jpegfile:
       self.image_data = jpegfile.read()
 
+    self.decodedImage: np.ndarray = None
     self.height: int = 0
     self.width: int = 0
     self.quantizationTabel: dict = {}
@@ -126,6 +168,37 @@ class JPEG:
     self.horizantalSubsamplingFactor: list = []
     self.verticalSubsamplingFactor: list = []
     self.quantizationTabelMapping: list = []
+  
+  def _buildMatrix(self, stream: Stream, dcTableId: int, acTableId: int, quantizationTable: list, oldDcCoefficient: int) -> tuple:
+    i = DCT()
+
+    code = self.huffmanTables[0b00 | dcTableId].getCode(stream)
+    bits = stream.getBits(code)
+    dcCoeff = decodeNumber(code, bits) + oldDcCoefficient
+    i.base[0] = dcCoeff
+
+    l = 1
+    while l < 64:
+      code = self.huffmanTables[0b10 | acTableId].getCode(stream)
+      if code == 0: break
+      if code == 0xF0:
+        l += 16
+        continue
+      elif code > 15:
+        l += code >> 4
+        code &= 0x0F
+      
+      bits = stream.getBits(code)
+
+      if l < 64:
+        i.base[l] = decodeNumber(code, bits)
+        l += 1
+    
+    i.base = np.multiply(i.base, quantizationTable)
+    i.rearrange()
+    i.idct()
+
+    return i, dcCoeff
 
   def decodeQuantizationTable(self, data: np.ndarray):
     offset = 0
@@ -169,8 +242,44 @@ class JPEG:
       self.huffmanTables[tableClass << 1 | tableIdentifier] = huffmanTable
 
   def decodeSOS(self, data: np.ndarray):
-    # print("Start of Scan")
-    pass
+    ls = int.from_bytes(data[:1], "big")
+    ns = int.from_bytes(data[1:3], "big")
+    csj = unpack("BB"*ns, data[3:3+2*ns])
+    
+    dcTableMapping = []
+    acTableMapping = []
+    for i in range(ns):
+      dcTableMapping.append(csj[2*i+1] >> 4)
+      acTableMapping.append(csj[2*i+1] & 0x0F)
+    data = data[6+2*ns:]
+
+    i = 0
+    while i < len(data) - 1:
+      m = int.from_bytes(data[i:i+2], "big")
+      if m == 0xFF00:
+        data = data[:i+1] + data[i+2:]
+      i += 1
+    
+    image = Image(self.height, self.width)
+    stream = Stream(data)
+    oldlumaDcCoefficient, oldCbDcCoefficient, oldCrDcCoefficient = 0, 0, 0
+    for y in range(self.height // 8):
+      for x in range(self.width // 8):
+        matLuma, oldlumaDcCoefficient = self._buildMatrix(
+          stream, dcTableMapping[0], acTableMapping[0],
+          self.quantizationTabel[self.quantizationTabelMapping[0]],
+          oldlumaDcCoefficient)
+        matCb, oldCbDcCoefficient = self._buildMatrix(
+          stream, dcTableMapping[1], acTableMapping[1],
+          self.quantizationTabel[self.quantizationTabelMapping[1]],
+          oldCbDcCoefficient)
+        matCr, oldCrDcCoefficient = self._buildMatrix(
+          stream, dcTableMapping[2], acTableMapping[2],
+          self.quantizationTabel[self.quantizationTabelMapping[2]],
+          oldCrDcCoefficient)
+        image.drawMatrix(y, x, matLuma.base, matCb.base, matCr.base)
+    image.ycbcr2rgb()
+    self.decodeedImage = image.image
 
   def decode(self):
     data = self.image_data
@@ -202,23 +311,8 @@ class JPEG:
         else:
           print(f"\tSkpped {length} bytes")
 
-# def idct2d(input: np.ndarray) -> np.ndarray:
-#   l = input.shape[0]
-#   c = np.zeros((l, l))
-#   for k in range(l):
-#     for n in range(l):
-#       c[k, n] = np.sqrt(1/l) * np.cos(np.pi*k*(1/2+n)/l)
-#       if k != 0:
-#         c[k, n] *= np.sqrt(2)
-#   return (np.kron(c, c) @ input.flatten()).reshape((l, l))
-
 # def quantize(input: np.ndarray, q: np.ndarray) -> np.ndarray:
 #   return input // q
-
-# def decodeNumber(code, bits):
-#   l = 2 ** (code - 1)
-#   if bits >= l: return bits
-#   return bits - (2 * l - 1)
 
 if __name__ == "__main__":
   if (len(sys.argv) != 2):
@@ -232,3 +326,4 @@ if __name__ == "__main__":
   
   jpeg = JPEG(input)
   jpeg.decode()
+  plt.imsave("out.png", jpeg.decodeedImage)
