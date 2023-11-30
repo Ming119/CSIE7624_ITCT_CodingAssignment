@@ -28,20 +28,26 @@ class JPEG:
   def __init__(self, image_path: str):
     with open(image_path, "rb") as jpegfile:
       self.image_data = jpegfile.read()
+
+    self.quantizationTabel: dict = {}
   
-  def decodeHuffmanTable(self, data: bytes):
+  def decodeQuantizationTable(self, data: np.ndarray):
+    offset = 0
+    while offset < len(data):
+      identifier = int.from_bytes(data[offset:offset+1], "big")
+      quant_values = [int(byte) for byte in data[offset + 1: offset + 65]]
+      self.quantizationTabel[identifier] = quant_values
+      offset += 65
+
+  def decodeHuffmanTable(self, data: np.ndarray):
     # print("Huffman Table")
     pass
 
-  def decodeQuantizationTable(self, data: bytes):
-    # print("Quantization Table")
-    pass
-
-  def decodeSOF(self, data: bytes):
+  def decodeSOF(self, data: np.ndarray):
     # print("Start of Frame")
     pass
 
-  def decodeSOS(self, data: bytes):
+  def decodeSOS(self, data: np.ndarray):
     # print("Start of Scan")
     pass
 
@@ -49,31 +55,31 @@ class JPEG:
     data = self.image_data
     while len(data) > 0:
       marker = int.from_bytes(data[:2], "big")
-      print(f"{marker_mapping[marker]}", end="")
+      print(f"{marker_mapping[marker]}")
 
       if marker == 0xFFD8:    # SOI
         data = data[2:]
-      elif marker == 0xFFD9:  # EOI
-        print()
-        return
+      
       elif marker == 0xFFDA:  # SOS
         self.decodeSOS(data[2:-2])
         data = data[-2:]
+      
+      elif marker == 0xFFD9:  # EOI
+        return
+      
       else:
         length = int.from_bytes(data[2:4], "big")
         chunk = data[4:2+length]
         data = data[2+length:]
-        print(f"\tLength: {length} bytes", end="")
-        if marker == 0xFFC4:    # DHT
-          self.decodeHuffmanTable(chunk)
-        elif marker == 0xFFDB:  # DQT
+
+        if marker == 0xFFDB:  # DQT
           self.decodeQuantizationTable(chunk)
         elif marker == 0xFFC0:  # SOF0
           self.decodeSOF(chunk)
+        elif marker == 0xFFC4:    # DHT
+          self.decodeHuffmanTable(chunk)
         else:
-          print(f"\tskipped", end="")
-      
-      print()
+          print(f"\tSkpped {length} bytes")
 
 # def idct2d(input: np.ndarray) -> np.ndarray:
 #   l = input.shape[0]
