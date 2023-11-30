@@ -24,27 +24,48 @@ marker_mapping: dict = {
   0xFFFE: "Comment (COM)",
 }
 
+subsample_mapping: dict = {
+  "11": "4:4:4",
+  "21": "4:2:2",
+  "22": "4:2:0",
+  "41": "4:1:1",
+}
+
 class JPEG:
   def __init__(self, image_path: str):
     with open(image_path, "rb") as jpegfile:
       self.image_data = jpegfile.read()
 
     self.quantizationTabel: dict = {}
-  
+    self.height: int = 0
+    self.width: int = 0
+    self.numComponents: int = 0
+    self.horizantalSubsamplingFactor: list = []
+    self.verticalSubsamplingFactor: list = []
+    self.quantizationTabelMapping: list = []
+
   def decodeQuantizationTable(self, data: np.ndarray):
     offset = 0
     while offset < len(data):
       identifier = int.from_bytes(data[offset:offset+1], "big")
-      quant_values = [int(byte) for byte in data[offset + 1: offset + 65]]
-      self.quantizationTabel[identifier] = quant_values
+      self.quantizationTabel[identifier] = [int(byte) for byte in data[offset + 1: offset + 65]]
       offset += 65
+
+  def decodeSOF(self, data: np.ndarray):
+    precision = int.from_bytes(data[:1], "big")
+    self.height = int.from_bytes(data[1:3], "big")
+    self.width = int.from_bytes(data[3:5], "big")
+    self.numComponents = int.from_bytes(data[5:6], "big")
+
+    for i in range(self.numComponents):
+      identifier = int.from_bytes(data[6 + 3*i:7 + 3*i], "big")
+      subsamplingFactor = int.from_bytes(data[7 + 3*i:8 + 3*i], "big")
+      self.quantizationTabelMapping.append(int.from_bytes(data[8 + 3*i:9 + 3*i], "big"))
+      self.horizantalSubsamplingFactor.append(subsamplingFactor >> 4)
+      self.verticalSubsamplingFactor.append(subsamplingFactor & 0x0F)
 
   def decodeHuffmanTable(self, data: np.ndarray):
     # print("Huffman Table")
-    pass
-
-  def decodeSOF(self, data: np.ndarray):
-    # print("Start of Frame")
     pass
 
   def decodeSOS(self, data: np.ndarray):
