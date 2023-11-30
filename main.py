@@ -31,6 +31,64 @@ subsample_mapping: dict = {
   "41": "4:1:1",
 }
 
+class Stream:
+  def __init__(self, data: np.ndarray):
+    self.data: np.ndarray = data
+    self.pos: int = 0
+
+  def getBit(self):
+    byte = self.data[self.pos >> 3]
+    bit = (byte >> (7 - (self.pos & 0x07))) & 0x01
+    self.pos += 1
+    return bit
+
+  def getBits(self, n: int):
+    res = 0
+    for _ in range(n):
+      res = (res << 1) | self.getBit()
+    return res
+
+class HuffmanTable:
+  def __init__(self):
+    self.root:     list = list()
+    self.elements: list = list()
+  
+  def bitsFromLengths(self, root: list, element: list, pos: int) -> bool:
+    if isinstance(root, list):
+      if pos == 0:
+        if len(root) < 2:
+          root.append([element])
+          return True
+        return False
+      
+      for i in [0, 1]:
+        if len(root) == i:
+          root.append([])
+        if self.bitsFromLengths(root[i], element, pos - 1):
+          return True
+    return False
+  
+  def getHuffmanBits(self, lengths: int, elements: list) -> None:
+    self.elements = elements
+    
+    ii = 0
+    for i in range(len(lengths)):
+      for _ in range(lengths[i]):
+        self.bitsFromLengths(self.root, elements[ii], i)
+        ii += 1
+
+  def find(self, stream: Stream) -> int:
+    root = self.root
+    while isinstance(root, list):
+      root = root[stream.getBit()]
+    return root
+  
+  def getcode(self, stream: Stream) -> int:
+    while True:
+      res: int = self.find(stream)
+      if res == 0: return 0
+      if res != -1: return res
+
 class JPEG:
   def __init__(self, image_path: str):
     with open(image_path, "rb") as jpegfile:
