@@ -133,7 +133,7 @@ class JPEG:
                 additionalBits = bits_from_bytearray(scan_data, current_bit, s)
                 current_bit += s
 
-                acCoeff = get_signed_value(acCode, additionalBits)
+                acCoeff = get_signed_value(additionalBits, s)
                 dct_coeffs[k] = acCoeff
               
               idct.record(dct_coeffs)
