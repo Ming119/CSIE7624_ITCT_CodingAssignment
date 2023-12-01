@@ -50,3 +50,30 @@ class HuffmanTable:
       print()
   
     return hts
+  
+  def _bit_from_bytearray(self, data: bytearray, bit_idx: int) -> int:
+    return (data[bit_idx // 8] & (1 << (7 - (bit_idx % 8)))) >> (7 - bit_idx % 8)
+  
+  def bits_from_bytearray(self, data: bytearray, start_idx: int, length: int) -> int:
+    out = 0
+    for bit_idx in range(start_idx, start_idx + length):
+      out = (out << 1) | self._bit_from_bytearray(data, bit_idx)
+    return out
+
+  def getCode(self, data: bytearray, data_pos: int) -> int:
+    encoded_bits = self._bit_from_bytearray(data, data_pos)
+    start_bit = data_pos
+    current_pos = data_pos + 1
+
+    while (encoded_bits, current_pos - start_bit) not in self.huffmanData:
+      encoded_bits = (encoded_bits << 1) | self._bit_from_bytearray(data, current_pos)
+      current_pos += 1
+    
+    num_bits = current_pos - start_bit
+    return self.huffmanData[(encoded_bits, num_bits)], num_bits
+  
+  def decode(self, bits: int, length: int) -> int:
+    if bits < 2 ** (length - 1):
+      min_val = (-1 << length) + 1
+      return bits + min_val
+    return bits

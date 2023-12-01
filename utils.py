@@ -12,9 +12,8 @@ MARKERS: List = [
   "[Invalid Marker]"
 ]
 
-subsample_mapping: dict = {
-  "11": "4:4:4",
-  "21": "4:2:2",
-  "22": "4:2:0",
-  "41": "4:1:1",
-}
+def ycbcr_to_rgb(l, cb, cr):
+  red = cr * (2 - 2 * 0.299) + l
+  blue = cb * (2 - 2 * 0.114) + l
+  green = (l - 0.114 * blue - 0.299 * red) / 0.587
+  return min(255, max(0, round(red + 128))), min(255, max(0, round(green + 128))), min(255, max(0, round(blue + 128)))
