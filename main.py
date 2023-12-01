@@ -1,5 +1,6 @@
 import sys
 import matplotlib.pyplot as plt
+import timeit
 
 from JPEG import JPEG
 
@@ -14,5 +15,8 @@ if __name__ == "__main__":
     print("Input file must be a JPEG image")
     exit(1)
   
+  start = timeit.default_timer()
   jpeg = JPEG(input_path, output_path)
   jpeg.decode()
+  stop = timeit.default_timer()
+  print("Decoding time: ", stop - start)

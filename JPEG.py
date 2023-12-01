@@ -80,6 +80,7 @@ class JPEG:
     current_bit = 0
     prediction = [0 for _ in range(self.sof.num_components)]
 
+    print("Processing MCU...")
     for mcu_y in range(num_mcu_height):
       for mcu_x in range(num_mcu_width):
         
