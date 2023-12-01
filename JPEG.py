@@ -1,11 +1,9 @@
-# from IDCT import IDCT
-# from Image import Image
-# from Stream import Stream
 from PIL import Image as PILImage
 from utils import *
 from struct import unpack
-from typing import BinaryIO
+from typing import BinaryIO, List, Tuple
 
+from StartOfScan import StartOfScan
 from StartOfFrame import StartOfFrame
 from HuffmanTable import HuffmanTable
 from QuantizationTable import QuantizationTable
@@ -17,11 +15,12 @@ class JPEG:
 
     self.height: int = 0
     self.width:  int = 0
-
+    self.image: List[int] = []
     self.qt: dict = {}
-    self.qtMap: list = []
-
     self.ht: dict = {}
+
+    self.sof: StartOfFrame = None
+    self.sos: StartOfScan = None
   
   def _handleEOI(self):
     img = PILImage.new("RGB", (self.width, self.height))
@@ -83,38 +82,31 @@ class JPEG:
 
   #   return i, dcCoeff
 
+  def _readMCU(self):
+    pass
+
   def _handleDQT(self, fp: BinaryIO) -> None:
     for table in QuantizationTable.defineQT(fp):
       self.qt[table.id] = table.table
 
-  def _handleSOF(self, fp: BinaryIO) -> StartOfFrame:
-    sof = StartOfFrame.readSOF(fp)
-    self.height = sof.height
-    self.width = sof.width
-
-    return sof
+  def _handleSOF(self, fp: BinaryIO):
+    self.sof = StartOfFrame.readSOF(fp)
+    self.height = self.sof.height
+    self.width = self.sof.width
+    self.image = [0] * (self.height * self.width)
 
   def _handleDHT(self, fp: BinaryIO):
     for table in HuffmanTable.defineHT(fp):
       self.ht[table.id, table.tc] = table.huffmanData
     
-  # def decodeSOS(self, data: list, headerLength: int) -> int:
-  #   data, length = self._removeFF00(data[headerLength:])
-
-  #   stream = Stream(data)
-  #   oldlumaDcCoefficient, oldCbDcCoefficient, oldCrDcCoefficient = 0, 0, 0
-  #   image = Image(self.height, self.width)
-  #   for y in range(self.height // 8):
-  #     for x in range(self.width // 8):
-  #       print(f"\tBlock {y} {x}")
-  #       matL,  oldlumaDcCoefficient = self._buildMatrix(stream, 0, self.qt[self.qtMap[0]], oldlumaDcCoefficient)
-  #       matCr, oldCrDcCoefficient   = self._buildMatrix(stream, 1, self.qt[self.qtMap[1]], oldCrDcCoefficient)
-  #       matCb, oldCbDcCoefficient   = self._buildMatrix(stream, 1, self.qt[self.qtMap[1]], oldCbDcCoefficient)  
-  #       image.drawMatrix(y, x, matL.base, matCb.base, matCr.base)
-  #   self.image = image.image
-
-  #   return length + headerLength
-
+  def _handleSOS(self, fp: BinaryIO):
+    if self.sof is None:
+      print("Error: SOF not defined")
+      exit(1)
+    
+    self.sos = StartOfScan.readSOS(fp)
+    self._readMCU()
+  
   def decode(self):
     with open(self.input_path, "rb") as fp:
       marker_bytes = fp.read(2)
@@ -138,7 +130,7 @@ class JPEG:
         elif marker == 0xFFC4:  # DHT
           self._handleDHT(fp)
         elif marker == 0xFFC0 or marker == 0xFFC1:  # SOF0 or SOF1
-          sof = self._handleSOF(fp)
+          self._handleSOF(fp)
         elif marker == 0xFFDA:  # SOS
           self._handleSOS(fp)
         else:
