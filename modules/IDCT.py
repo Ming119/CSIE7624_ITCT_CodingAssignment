@@ -22,7 +22,7 @@ class IDCT:
     self.base = [[0 for _ in range(8)] for _ in range(8)]
     self.qt = qt
    
-  def record(self, coeffs: List[int]):
+  def record(self, coeffs: List[int]) -> None:
     for i, coeff in enumerate(coeffs):
       row, col = QuantizationTable.zigzag[i]
       self.base[row][col] = coeff * self.qt.table[row][col]

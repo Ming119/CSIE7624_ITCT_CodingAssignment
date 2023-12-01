@@ -27,7 +27,7 @@ class JPEG:
     self.sof: StartOfFrame = None
     self.sos: StartOfScan = None
   
-  def _handleEOI(self):
+  def _handleEOI(self) -> None:
     self.image.save(self.output_path or f"{self.filename}.bmp")
     
   def __removeStuffByte(self, fp: BinaryIO) -> bytearray:
@@ -64,7 +64,7 @@ class JPEG:
     fp.seek(start_pos + marker_pos)
     return data[:marker_pos - marker_pos_diff]
 
-  def _readMCU(self, fp: BinaryIO):
+  def _readMCU(self, fp: BinaryIO) -> None:
     mcu_height = self.sof.max_vsf * 8
     mcu_width  = self.sof.max_hsf * 8
 
@@ -154,17 +154,17 @@ class JPEG:
     for table in QuantizationTable.defineQT(fp):
       self.qt[table.id] = table
 
-  def _handleSOF(self, fp: BinaryIO):
+  def _handleSOF(self, fp: BinaryIO) -> None:
     self.sof = StartOfFrame.readSOF(fp)
     self.height = self.sof.height
     self.width = self.sof.width
     self.image = Image(self.height, self.width)
 
-  def _handleDHT(self, fp: BinaryIO):
+  def _handleDHT(self, fp: BinaryIO) -> None:
     for table in HuffmanTable.defineHT(fp):
       self.ht[table.id, table.tc] = table
     
-  def _handleSOS(self, fp: BinaryIO):
+  def _handleSOS(self, fp: BinaryIO) -> None:
     if self.sof is None:
       print("Error: SOF not defined")
       exit(1)
@@ -172,7 +172,7 @@ class JPEG:
     self.sos = StartOfScan.readSOS(fp)
     self._readMCU(fp)
   
-  def decode(self):
+  def decode(self) -> None:
     with open(self.input_path, "rb") as fp:
       marker_bytes = fp.read(2)
       while marker_bytes:
