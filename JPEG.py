@@ -2,13 +2,16 @@ import math
 from utils import *
 from typing import BinaryIO, List, Dict, Tuple
 
-from PIL import Image as PILImage
 from struct import unpack
 
+from IDCT import IDCT
+from Image import Image
 from StartOfScan import StartOfScan
 from StartOfFrame import StartOfFrame
 from HuffmanTable import HuffmanTable
 from QuantizationTable import QuantizationTable
+
+DEBUG = True
 
 class JPEG:
   def __init__(self, input_path: str, output_path: str = None):
@@ -17,7 +20,7 @@ class JPEG:
 
     self.height: int = 0
     self.width:  int = 0
-    self.image: List[int] = []
+    self.image: Image = None
     self.qt: Dict[int, QuantizationTable] = {}
     self.ht: Dict[Tuple[int, int], HuffmanTable] = {}
 
@@ -25,10 +28,8 @@ class JPEG:
     self.sos: StartOfScan = None
   
   def _handleEOI(self):
-    img = PILImage.new("RGB", (self.width, self.height))
-    img.putdata(self.image)
-    img.save(self.output_path or "output.bmp")
-
+    self.image.save(self.output_path or "output.bmp")
+    
   def __removeStuffByte(self, fp: BinaryIO) -> bytearray:
     start_pos = fp.tell()
     fp.seek(0, 2)
@@ -75,14 +76,12 @@ class JPEG:
     print()
 
     scan_data = self.__removeStuffByte(fp)
-
-    image_rgb = [[(0, 0, 0) for _ in range(self.width)] for _ in range(self.height)]
+    
     current_bit = 0
     prediction = [0 for _ in range(self.sof.num_components)]
 
     for mcu_y in range(num_mcu_height):
       for mcu_x in range(num_mcu_width):
-        print(f"\tMCU {mcu_x}, {mcu_y}")
         
         mcu_list = []
         for scanComponentIdx, scanComponent in self.sos.components.items():
@@ -97,24 +96,27 @@ class JPEG:
 
           mcu = [[0 for _ in range(8 * frameComponent.hsf)] for _ in range(8 * frameComponent.vsf)]
 
-          for _r in range(frameComponent.vsf):
-            for _c in range(frameComponent.hsf):
-             
+          for data_unit_row in range(frameComponent.vsf):
+            for data_unit_col in range(frameComponent.hsf):
+              idct = IDCT(qt)
+
               dcCode, length = dcht.getCode(scan_data, current_bit)
               current_bit += length
 
-              additionalBits = dcht.bits_from_bytearray(scan_data, current_bit, dcCode)
+              additionalBits = bits_from_bytearray(scan_data, current_bit, dcCode)
               current_bit += dcCode
 
-              diff = dcht.decode(dcCode, additionalBits)
-              abs_diff = prediction[scanComponentIdx] + diff
-              prediction[scanComponentIdx] = abs_diff
-
+              diff = get_signed_value(dcCode, additionalBits)
+              abs_diff = prediction[scanComponentIdx - 1] + diff
+              prediction[scanComponentIdx - 1] = abs_diff
+                                    
               dct_coeffs = [0 for _ in range(64)]
               dct_coeffs[0] = abs_diff
 
-              k = 1
-              while k < 64:
+              k = 0
+              while k != 63:
+                k += 1
+
                 acCode, length = acht.getCode(scan_data, current_bit)
                 current_bit += length
 
@@ -128,26 +130,15 @@ class JPEG:
                   else: break
 
                 k += r
-                additionalBits = acht.bits_from_bytearray(scan_data, current_bit, s)
+                additionalBits = bits_from_bytearray(scan_data, current_bit, s)
                 current_bit += s
 
-                acCoeff = acht.decode(acCode, additionalBits)
+                acCoeff = get_signed_value(acCode, additionalBits)
                 dct_coeffs[k] = acCoeff
-                k += 1
               
-              dct_matrix = [[0 for _ in range(8)] for _ in range(8)]
-              for i, coeff in enumerate(dct_coeffs):
-                row, col = QuantizationTable.zigzag[i]
-                dct_matrix[row][col] = coeff * qt[i]
+              idct.record(dct_coeffs)
+              mcu = idct.perform_idct(mcu, data_unit_row, data_unit_col)
               
-              for y in range(8):
-                for x in range(8):
-                  val = 0
-                  for u in range(8):
-                    for v in range(8):
-                      val += dct_matrix[u][v] * math.cos((2 * x + 1) * u * math.pi / 16) * math.cos((2 * y + 1) * v * math.pi / 16)
-                  mcu[y + _r * 8][x + _c * 8] = val / 4
-        
           hm = self.sof.max_hsf // frameComponent.hsf
           vm = self.sof.max_vsf // frameComponent.vsf
 
@@ -162,7 +153,7 @@ class JPEG:
           for x in range(mcu_width):
             if mcu_x * mcu_width + x >= self.width: break
 
-            image_rgb[mcu_y * mcu_height + y][mcu_x * mcu_width + x] = ycbcr_to_rgb(mcu_list[0][y][x], mcu_list[1][y][x], mcu_list[2][y][x])
+            self.image.draw(mcu_y * mcu_height + y, mcu_x * mcu_width + x, mcu_list[0][y][x], mcu_list[1][y][x], mcu_list[2][y][x])
 
   def _handleDQT(self, fp: BinaryIO) -> None:
     for table in QuantizationTable.defineQT(fp):
@@ -172,7 +163,7 @@ class JPEG:
     self.sof = StartOfFrame.readSOF(fp)
     self.height = self.sof.height
     self.width = self.sof.width
-    self.image = [0] * (self.height * self.width)
+    self.image = Image(self.height, self.width)
 
   def _handleDHT(self, fp: BinaryIO):
     for table in HuffmanTable.defineHT(fp):

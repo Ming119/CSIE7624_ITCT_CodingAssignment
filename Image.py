@@ -1,24 +1,25 @@
-import numpy as np
+from typing import List, Tuple
+from PIL import Image as PILImage
 
 class Image:
   def __init__(self, height: int, width: int):
     self.height: int = height
     self.width: int = width
-    self.image = np.zeros((height, width, 3), dtype=np.uint8)
+    self.image: List[List[Tuple[int, int, int]]] = [[(0, 0, 0) for _ in range(width)] for _ in range(height)]
   
-  def ycbcr2rgb(self):
-    self.image[:, :, 0] += 128
-    m = np.array([
-      [1, 0, 1.402],
-      [1, -0.34414, -0.71414],
-      [1, 1.772, 0]
-    ])
-    rgb = np.dot(self.image, m.T)
-    self.image = np.clip(rgb, 0, 255)
+  def _clamp(self, value: int, _min: int = 0, _max: int = 255) -> int:
+    return min(max(value, _min), _max)
   
-  def drawMatrix(self, y, x, l, cb, cr):
-    x *= 8
-    y *= 8
-    self.image[y:y+8, x:x+8, 0] = l.reshape((8, 8))
-    self.image[y:y+8, x:x+8, 1] = cb.reshape((8, 8))
-    self.image[y:y+8, x:x+8, 2] = cr.reshape((8, 8))
+  def _ycbcr_to_rgb(self, l, cb, cr) -> Tuple[int, int, int]:
+    red = cr * (2 - 2 * 0.299) + l + 128
+    blue = cb * (2 - 2 * 0.114) + l + 128
+    green = (l - 0.114 * blue - 0.299 * red) / 0.587 + 128
+    return (self._clamp(red), self._clamp(green), self._clamp(blue))
+
+  def draw(self, y: int, x: int, l: int, cb: int, cr: int) -> None:
+    self.image[y][x] = self._ycbcr_to_rgb(l, cb, cr)
+
+  def save(self, path: str) -> None:
+    img = PILImage.new("RGB", (self.width, self.height))
+    img.putdata([pixel for row in self.image for pixel in row])
+    print(f"Saved image to {path}")

@@ -12,8 +12,17 @@ MARKERS: List = [
   "[Invalid Marker]"
 ]
 
-def ycbcr_to_rgb(l, cb, cr):
-  red = cr * (2 - 2 * 0.299) + l
-  blue = cb * (2 - 2 * 0.114) + l
-  green = (l - 0.114 * blue - 0.299 * red) / 0.587
-  return min(255, max(0, round(red + 128))), min(255, max(0, round(green + 128))), min(255, max(0, round(blue + 128)))
+def _bit_from_bytearray(data: bytearray, bit_idx: int) -> int:
+  return (data[bit_idx // 8] & (0b1 << (7 - (bit_idx % 8)))) >> (7 - bit_idx % 8)
+  
+def bits_from_bytearray(data: bytearray, start_idx: int, length: int) -> int:
+  out = 0
+  for bit_idx in range(start_idx, start_idx + length):
+    out = (out << 1) | _bit_from_bytearray(data, bit_idx)
+  return out
+
+def get_signed_value(bits: int, length: int) -> int:
+  if bits < 2 ** (length - 1):
+    min_val = (-1 << length) + 1
+    return bits + min_val
+  return bits

@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple, BinaryIO
 from collections import defaultdict
 from struct import unpack
+from utils import _bit_from_bytearray
 
 class HuffmanTable:
   id: int = None
@@ -31,7 +32,7 @@ class HuffmanTable:
       for length, count in enumerate(ht.counts):
         for _ in range(count):
           huffman_byte, = unpack(">B", fp.read(1))
-          ht.huffmanData[(length + 1, code)] = huffman_byte
+          ht.huffmanData[(code, length + 1)] = huffman_byte
           length_code_map[length + 1].append(huffman_byte)
           code += 1
         code <<= 1
@@ -51,29 +52,16 @@ class HuffmanTable:
   
     return hts
   
-  def _bit_from_bytearray(self, data: bytearray, bit_idx: int) -> int:
-    return (data[bit_idx // 8] & (1 << (7 - (bit_idx % 8)))) >> (7 - bit_idx % 8)
-  
-  def bits_from_bytearray(self, data: bytearray, start_idx: int, length: int) -> int:
-    out = 0
-    for bit_idx in range(start_idx, start_idx + length):
-      out = (out << 1) | self._bit_from_bytearray(data, bit_idx)
-    return out
-
   def getCode(self, data: bytearray, data_pos: int) -> int:
-    encoded_bits = self._bit_from_bytearray(data, data_pos)
+    encoded_bits = _bit_from_bytearray(data, data_pos)
+    
     start_bit = data_pos
     current_pos = data_pos + 1
 
     while (encoded_bits, current_pos - start_bit) not in self.huffmanData:
-      encoded_bits = (encoded_bits << 1) | self._bit_from_bytearray(data, current_pos)
+      encoded_bits = (encoded_bits << 1) | _bit_from_bytearray(data, current_pos)
       current_pos += 1
     
     num_bits = current_pos - start_bit
     return self.huffmanData[(encoded_bits, num_bits)], num_bits
-  
-  def decode(self, bits: int, length: int) -> int:
-    if bits < 2 ** (length - 1):
-      min_val = (-1 << length) + 1
-      return bits + min_val
-    return bits
+    
