@@ -1,77 +1,52 @@
-import unittest
-from Stream import Stream
+from typing import Dict, List, Tuple, BinaryIO
+from collections import defaultdict
+from struct import unpack
 
 class HuffmanTable:
-  def __init__(self):
-    self.root:     list = []
-    self.elements: list = []
-  
-  def bitsFromLengths(self, root: list, element: list, pos: int) -> bool:
-    if isinstance(root, list):
-      if pos == 0:
-        if len(root) < 2:
-          root.append(element)
-          return True
-        return False
+  id: int = None
+  tc: int = None
+  counts: List[int] = []
+  huffmanData: Dict[Tuple[int, int], int] = {}
+
+  @staticmethod
+  def defineHT(fp: BinaryIO) -> List['HuffmanTable']:
+    size, = unpack(">H", fp.read(2))
+    size -= 2
+    hts = []
+
+    while size > 0:
+      ht = HuffmanTable()
+      ht.counts = [0 for _ in range(16)]
+      ht.huffmanData = {}
+
+      temp, = unpack(">B", fp.read(1))
+      ht.tc = temp >> 4
+      ht.id = temp & 0x0F
+
+      for i in range(16):
+        ht.counts[i], = unpack(">B", fp.read(1))
+     
+      length_code_map = defaultdict(list)
+      code = 0
+      for length, count in enumerate(ht.counts):
+        for _ in range(count):
+          huffman_byte, = unpack(">B", fp.read(1))
+          ht.huffmanData[(length + 1, code)] = huffman_byte
+          length_code_map[length + 1].append(huffman_byte)
+          code += 1
+        code <<= 1
       
-      for i in [0, 1]:
-        if len(root) == i:
-          root.append([])
-        if self.bitsFromLengths(root[i], element, pos - 1):
-          return True
-    return False
+      size -= (1 + 16 + sum(ht.counts))
+
+      hts.append(ht)
+
+      print(f"\tTable ID: {ht.id}\tClass: {ht.tc} " + ("(DC)" if ht.tc == 0 else "(AC)"))
+      for i in range(16):
+          print(f"\t\tCodes of length {i+1} bits ({ht.counts[i]} total): ", end="")
+          for huffman_byte in length_code_map[i+1]:
+              print(f"{huffman_byte:02X} ", end="")
+          print()
+      print(f"\tTotal number of codes: {sum(ht.counts)}")
+      print()
   
-  def getHuffmanBits(self, lengths: list, elements: list) -> None:
-    self.elements = elements
-    
-    j = 0
-    for idx, length in enumerate(lengths):
-      for _ in range(length):
-        self.bitsFromLengths(self.root, elements[j], idx)
-        j += 1
-
-  def find(self, stream: Stream) -> int:
-    root = self.root
-    while isinstance(root, list):
-      root = root[stream.getBit()]
-    return root
-  
-  def getCode(self, stream: Stream) -> int:
-    while True:
-      res: int = self.find(stream)
-      if res == 0: return 0
-      if res != -1: return res
-
-class TestHuffmanTable(unittest.TestCase):
-  def setUp(self):
-    self.huffman_table = HuffmanTable()
-
-  def test_bitsFromLengths(self):
-    root = []
-    element = [1, 2, 3]
-    pos = 2
-    self.assertTrue(self.huffman_table.bitsFromLengths(root, element, pos))
-    self.assertEqual(root, [[], [1, 2, 3]])
-
-  def test_getHuffmanBits(self):
-    lengths = [1, 2, 3]
-    elements = [1, 2, 3, 4, 5, 6]
-    self.huffman_table.getHuffmanBits(lengths, elements)
-    self.assertEqual(self.huffman_table.root, [[1], [[2], [3, 4, 5]]])
-
-  def test_find(self):
-    stream = Stream([])
-    stream.data = bytearray([0b10101010])
-    stream.position = 0
-    self.huffman_table.root = [[1], [[2], [3, 4, 5]]]
-    self.assertEqual(self.huffman_table.find(stream), 1)
-
-  def test_getCode(self):
-    stream = Stream([])
-    stream.data = bytearray([0b10101010])
-    stream.position = 0
-    self.huffman_table.root = [[1], [[2], [3, 4, 5]]]
-    self.assertEqual(self.huffman_table.getCode(stream), 1)
-
-if __name__ == '__main__':
-  unittest.main()
+    return hts
