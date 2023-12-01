@@ -33,6 +33,6 @@ class IDCT:
         val = 0
         for u in range(8):
           for v in range(8):
-            val += self.base[v][u] * IDCT.idctTable[y][x][u][v]
-        mcu[r*8 + y][c*8 + x] = val / 4
+            val += IDCT.idctTable[y][x][u][v] * self.base[v][u]
+        mcu[(r * 8) + y][(c * 8) + x] = val / 4
     return mcu

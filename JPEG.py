@@ -106,7 +106,7 @@ class JPEG:
               additionalBits = bits_from_bytearray(scan_data, current_bit, dcCode)
               current_bit += dcCode
 
-              diff = get_signed_value(dcCode, additionalBits)
+              diff = get_signed_value(additionalBits, dcCode)
               abs_diff = prediction[scanComponentIdx - 1] + diff
               prediction[scanComponentIdx - 1] = abs_diff
                                     
