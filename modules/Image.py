@@ -36,4 +36,4 @@ class Image:
     img = PILImage.new("RGB", (self.width, self.height))
     img.putdata([pixel for row in self.image for pixel in row])
     img.save(path)
-    print(f"Saved image to {path}")
+    print(f"\tSaved image to {path}")

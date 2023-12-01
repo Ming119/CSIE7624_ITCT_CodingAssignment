@@ -16,6 +16,7 @@ class JPEG:
   def __init__(self, input_path: str, output_path: str = None):
     self.input_path: str = input_path
     self.output_path: str = output_path
+    self.filename: str = input_path.split("/")[-1].split(".")[0]
 
     self.height: int = 0
     self.width:  int = 0
@@ -27,7 +28,7 @@ class JPEG:
     self.sos: StartOfScan = None
   
   def _handleEOI(self):
-    self.image.save(self.output_path or "output.bmp")
+    self.image.save(self.output_path or f"{self.filename}.bmp")
     
   def __removeStuffByte(self, fp: BinaryIO) -> bytearray:
     start_pos = fp.tell()
@@ -79,7 +80,7 @@ class JPEG:
     current_bit = 0
     prediction = [0 for _ in range(self.sof.num_components)]
 
-    print("Processing MCU...")
+    print("\tProcessing MCU...")
     for mcu_y in range(num_mcu_height):
       for mcu_x in range(num_mcu_width):
         

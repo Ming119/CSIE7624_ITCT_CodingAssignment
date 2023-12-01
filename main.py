@@ -5,7 +5,7 @@ from modules.JPEG import JPEG
 
 if __name__ == "__main__":
   if (len(sys.argv) < 2):
-    print("Usage: python main.py <input>")
+    print("python3 main.py <input_path> [<output_path>]")
     exit(1)
 
   input_path = sys.argv[1]
@@ -18,4 +18,5 @@ if __name__ == "__main__":
   jpeg = JPEG(input_path, output_path)
   jpeg.decode()
   stop = timeit.default_timer()
-  print("Decoding time: ", stop - start)
+  
+  print(f"Decoding took {stop - start} seconds")
