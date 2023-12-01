@@ -12,13 +12,13 @@ MARKERS: List = [
   "[Invalid Marker]"
 ]
 
-def _bit_from_bytearray(data: bytearray, bit_idx: int) -> int:
+def bit_from_bytearray(data: bytearray, bit_idx: int) -> int:
   return (data[bit_idx // 8] & (0b1 << (7 - (bit_idx % 8)))) >> (7 - bit_idx % 8)
   
 def bits_from_bytearray(data: bytearray, start_idx: int, length: int) -> int:
   out = 0
   for bit_idx in range(start_idx, start_idx + length):
-    out = (out << 1) | _bit_from_bytearray(data, bit_idx)
+    out = (out << 1) | bit_from_bytearray(data, bit_idx)
   return out
 
 def get_signed_value(bits: int, length: int) -> int:

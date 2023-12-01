@@ -1,6 +1,6 @@
 import math
 from typing import List
-from QuantizationTable import QuantizationTable
+from modules.QuantizationTable import QuantizationTable
 
 class IDCT:
   idctTable = []

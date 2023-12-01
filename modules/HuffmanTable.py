@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, BinaryIO
 from collections import defaultdict
 from struct import unpack
-from utils import _bit_from_bytearray
+from utils import bit_from_bytearray
 
 class HuffmanTable:
   id: int = None
@@ -53,13 +53,13 @@ class HuffmanTable:
     return hts
   
   def getCode(self, data: bytearray, data_pos: int) -> int:
-    encoded_bits = _bit_from_bytearray(data, data_pos)
+    encoded_bits = bit_from_bytearray(data, data_pos)
     
     start_bit = data_pos
     current_pos = data_pos + 1
 
     while (encoded_bits, current_pos - start_bit) not in self.huffmanData:
-      encoded_bits = (encoded_bits << 1) | _bit_from_bytearray(data, current_pos)
+      encoded_bits = (encoded_bits << 1) | bit_from_bytearray(data, current_pos)
       current_pos += 1
     
     num_bits = current_pos - start_bit

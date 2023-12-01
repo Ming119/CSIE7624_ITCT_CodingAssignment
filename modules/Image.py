@@ -20,8 +20,17 @@ class Image:
     green = self._clamp(round(self._offset + l + self._gCoeff[0] * cb + self._gCoeff[1] * cr))
     return (red, green, blue)
 
-  def draw(self, y: int, x: int, l: float, cb: float, cr: float) -> None:
+  def _draw_pixel(self, y: int, x: int, l: float, cb: float, cr: float) -> None:
     self.image[y][x] = self._ycbcr_to_rgb(l, cb, cr)
+
+  def draw_mcu(self, mcu_y: int, mcu_x: int, mcu_h: int, mcu_w: int, mcu: List[List[List[float]]]) -> None:
+    for y in range(mcu_h):
+      image_y = mcu_y * mcu_h + y
+      if image_y >= self.height: break
+      for x in range(mcu_w):
+        image_x = mcu_x * mcu_w + x
+        if image_x >= self.width: break
+        self._draw_pixel(image_y, image_x, mcu[0][y][x], mcu[1][y][x], mcu[2][y][x])
 
   def save(self, path: str) -> None:
     img = PILImage.new("RGB", (self.width, self.height))

@@ -1,6 +1,6 @@
 from typing import BinaryIO, Dict
 from struct import unpack
-from FrameComponent import FrameComponent
+from modules.FrameComponent import FrameComponent
 
 class StartOfFrame:
   def __init__(self):

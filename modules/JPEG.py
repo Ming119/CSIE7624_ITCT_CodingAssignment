@@ -1,15 +1,14 @@
 import math
 from utils import *
-from typing import BinaryIO, List, Dict, Tuple
-
+from typing import BinaryIO, Dict, Tuple
 from struct import unpack
 
-from IDCT import IDCT
-from Image import Image
-from StartOfScan import StartOfScan
-from StartOfFrame import StartOfFrame
-from HuffmanTable import HuffmanTable
-from QuantizationTable import QuantizationTable
+from modules.IDCT import IDCT
+from modules.Image import Image
+from modules.StartOfScan import StartOfScan
+from modules.StartOfFrame import StartOfFrame
+from modules.HuffmanTable import HuffmanTable
+from modules.QuantizationTable import QuantizationTable
 
 DEBUG = True
 
@@ -148,13 +147,7 @@ class JPEG:
           
           mcu_list.append(mcu)
         
-        for y in range(mcu_height):
-          if mcu_y * mcu_height + y >= self.height: break
-
-          for x in range(mcu_width):
-            if mcu_x * mcu_width + x >= self.width: break
-
-            self.image.draw(mcu_y * mcu_height + y, mcu_x * mcu_width + x, mcu_list[0][y][x], mcu_list[1][y][x], mcu_list[2][y][x])
+        self.image.draw_mcu(mcu_y, mcu_x, mcu_height, mcu_width, mcu_list)
 
   def _handleDQT(self, fp: BinaryIO) -> None:
     for table in QuantizationTable.defineQT(fp):

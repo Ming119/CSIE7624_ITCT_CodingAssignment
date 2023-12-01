@@ -1,8 +1,7 @@
 import sys
-import matplotlib.pyplot as plt
 import timeit
 
-from JPEG import JPEG
+from modules.JPEG import JPEG
 
 if __name__ == "__main__":
   if (len(sys.argv) < 2):

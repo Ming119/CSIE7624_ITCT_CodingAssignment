@@ -1,6 +1,6 @@
 from typing import Dict, Tuple, BinaryIO
-from ScanComponent import ScanComponent
 from struct import unpack
+from modules.ScanComponent import ScanComponent
 
 class StartOfScan:
   def __init__(self):
